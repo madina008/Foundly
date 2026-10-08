@@ -6,6 +6,24 @@ export interface CategoryInfo {
   iconName: string;
 }
 
+export interface UserProfile {
+  id: string;
+  name: string;
+  surname: string;
+  email: string;
+  universityId: string;
+  universityName: string;
+  universityCity: string;
+  faculty?: string;
+  course?: string;
+  createdAt: string;
+}
+
+export interface AuthResponse {
+  user: UserProfile;
+  token: string;
+}
+
 export interface FoundItem {
   id: string;
   title: string;
@@ -13,18 +31,22 @@ export interface FoundItem {
   description: string;
   location: string;
   campusZone: string;
+  universityId?: string;
+  universityName?: string;
   date: string;
   time: string;
-  status: 'Найдена' | 'Ожидает подтверждения' | 'Передано в бюро находок';
-  statusColor: 'emerald' | 'amber' | 'blue';
-  finderType: 'Студент' | 'Сотрудник библиотеки' | 'Охрана кампуса' | 'Преподаватель';
+  status: 'Найдена' | 'Ожидает подтверждения' | 'Передано в бюро находок' | 'Возвращено владельцу';
+  statusColor?: 'emerald' | 'amber' | 'blue' | 'purple';
+  finderType: 'Студент' | 'Сотрудник библиотеки' | 'Охрана кампуса' | 'Преподаватель' | 'Пользователь';
   finderName: string;
   imageUrl: string;
   distinctiveFeatures: string[];
   finderNote: string;
   storagePlace: string;
-  // Demo matching attributes
   keywords: string[];
+  userId?: string | null;
+  authorEmail?: string;
+  createdAt?: string;
 }
 
 export interface SearchQuery {
@@ -32,6 +54,7 @@ export interface SearchQuery {
   category: CategoryType | 'all';
   location: string;
   hasPhoto?: boolean;
+  universityFilter?: string; // 'my' | 'all' | specific universityId
 }
 
 export interface MatchResultItem {
@@ -44,4 +67,3 @@ export interface MatchResultItem {
   };
   highlightFeatures: string[];
 }
-

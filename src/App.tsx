@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Header } from './components/Header';
 import { HeroSection } from './components/HeroSection';
 import { SearchForm } from './components/SearchForm';
@@ -11,11 +11,25 @@ import { ScanProgress } from './components/ScanProgress';
 import { MatchResults } from './components/MatchResults';
 import { ItemDetailModal } from './components/ItemDetailModal';
 import { ReportFoundModal } from './components/ReportFoundModal';
+import { UniversityCommunityBanner } from './components/UniversityCommunityBanner';
+import { AuthModal } from './components/AuthModal';
+import { ProfileModal } from './components/ProfileModal';
+import { UniversitySelectorModal } from './components/UniversitySelectorModal';
 import { matchLostItems } from './utils/matchingEngine';
-import { MatchResultItem, SearchQuery } from './types';
+import { FoundItem, MatchResultItem, SearchQuery } from './types';
 import { WalletProvider } from './context/WalletContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
+import { api } from './services/api';
 
 function MainApp() {
+  const {
+    activeFilter,
+    selectedUniversityId,
+    uniSelectorOpen,
+    closeUniSelector,
+    setSelectedUniversityId,
+  } = useAuth();
+
   const [currentQuery, setCurrentQuery] = useState<SearchQuery>({
     description: 'Белые беспроводные наушники',
     category: 'electronics',
@@ -29,9 +43,34 @@ function MainApp() {
   const [showReportModal, setShowReportModal] = useState(false);
   const [txSignature, setTxSignature] = useState<string | null>(null);
 
+  // Live server items
+  const [serverItems, setServerItems] = useState<FoundItem[]>([]);
+
+  // Load items from backend database
+  const loadItems = () => {
+    api.getItems()
+      .then((res) => {
+        if (res.items) setServerItems(res.items);
+      })
+      .catch((err) => {
+        console.warn('Could not fetch server items:', err);
+      });
+  };
+
+  useEffect(() => {
+    loadItems();
+  }, []);
+
   // Trigger search with optional blockchain txSignature
   const handleSearch = (query: SearchQuery, signature?: string) => {
-    setCurrentQuery(query);
+    // Inject active university filter
+    const effectiveFilter = activeFilter === 'my' ? selectedUniversityId : 'all';
+    const queryWithUni = {
+      ...query,
+      universityFilter: effectiveFilter,
+    };
+
+    setCurrentQuery(queryWithUni);
     if (signature) {
       setTxSignature(signature);
     }
@@ -40,7 +79,7 @@ function MainApp() {
 
   // Called after simulated AI scanning finishes (~1.5s)
   const handleScanComplete = () => {
-    const results = matchLostItems(currentQuery);
+    const results = matchLostItems(currentQuery, serverItems);
     setMatchResults(results);
     setIsScanning(false);
     setHasSearched(true);
@@ -71,6 +110,9 @@ function MainApp() {
       {/* Main Content Area */}
       <main className="flex-1 z-10 relative pb-16">
         
+        {/* Kazakhstan University Community Banner & Filter Header */}
+        <UniversityCommunityBanner />
+
         {/* If user hasn't searched yet, show Hero + Search Form */}
         {!hasSearched && !isScanning && (
           <div className="animate-in fade-in duration-300">
@@ -85,10 +127,10 @@ function MainApp() {
             <div className="max-w-4xl mx-auto px-4 mt-16 pt-8 border-t border-slate-900">
               <div className="text-center mb-8">
                 <span className="text-[11px] font-bold uppercase tracking-widest text-purple-400">
-                  Архитектура платформы
+                  Университетская платформа Казахстана
                 </span>
                 <h3 className="text-xl font-bold text-white mt-1">
-                  Как Foundly возвращает вещи
+                  Как Foundly возвращает вещи студентам
                 </h3>
               </div>
 
@@ -98,10 +140,10 @@ function MainApp() {
                     01
                   </div>
                   <h4 className="text-sm font-semibold text-white mb-1">
-                    Единая база кампуса
+                    Кампусы и ВУЗы РК
                   </h4>
                   <p className="text-xs text-slate-400 leading-relaxed">
-                    Все находки из чатов общежитий, постов охраны и библиотек агрегируются в одном защищённом реестре.
+                    Единая сеть для Zhubanov, Heriot-Watt, NU, КазНУ, Satbayev и других ВУЗов страны с фильтрацией «Мой университет».
                   </p>
                 </div>
 
@@ -171,24 +213,42 @@ function MainApp() {
         <ReportFoundModal
           onClose={() => setShowReportModal(false)}
           onItemAdded={() => {
-            setShowReportModal(false);
+            loadItems();
           }}
         />
       )}
+
+      {/* Auth Modal (Login & Registration) */}
+      <AuthModal />
+
+      {/* Profile Modal (Personal data & My Items) */}
+      <ProfileModal
+        onOpenReportFound={() => setShowReportModal(true)}
+      />
+
+      {/* Global University Selector Modal */}
+      <UniversitySelectorModal
+        isOpen={uniSelectorOpen}
+        onClose={closeUniSelector}
+        selectedId={selectedUniversityId}
+        onSelect={(uni) => {
+          setSelectedUniversityId(uni.id);
+        }}
+      />
 
       {/* Footer */}
       <footer className="border-t border-slate-900 bg-[#06080e] py-6 px-4 text-xs text-slate-400 z-10 relative">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-bold text-slate-300">Foundly</span>
+            <span className="font-bold text-slate-300">Foundly Kazakhstan</span>
             <span className="text-slate-600">•</span>
-            <span>AI Lost & Found Network</span>
+            <span>AI Lost & Found Campus Network</span>
           </div>
 
           <div className="flex items-center gap-4 text-slate-400">
-            <span>Прототип для университетов и кампусов</span>
+            <span>Студенческие кампусы Казахстана</span>
             <span className="text-slate-700">•</span>
-            <span className="text-slate-400">8 октября 2026 г.</span>
+            <span className="text-slate-400">2026 г.</span>
           </div>
         </div>
       </footer>
@@ -198,8 +258,10 @@ function MainApp() {
 
 export default function App() {
   return (
-    <WalletProvider>
-      <MainApp />
-    </WalletProvider>
+    <AuthProvider>
+      <WalletProvider>
+        <MainApp />
+      </WalletProvider>
+    </AuthProvider>
   );
 }
