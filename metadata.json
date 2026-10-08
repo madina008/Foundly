@@ -1,0 +1,6 @@
+{
+  "name": "Foundly — AI-платформа для поиска вещей",
+  "description": "Интеллектуальный сервис сопоставления потерянных и найденных вещей с помощью AI для университетов и кампусов.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
