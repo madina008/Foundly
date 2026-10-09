@@ -77,17 +77,21 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       setBalance(Number(sol.toFixed(4)));
     } catch (err) {
       console.warn('Failed to fetch devnet balance:', err);
-      if (balance === null) setBalance(0);
+      setBalance((prev) => (prev === null ? 0 : prev));
     } finally {
       setIsRefreshingBalance(false);
     }
-  }, [balance]);
+  }, []);
 
   const connectWallet = useCallback(async (): Promise<string | null> => {
     setErrorMessage(null);
     setIsLoading(true);
 
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('foundly_wallet_disconnected');
+      }
+
       const provider = getProvider();
       if (!provider) {
         setErrorMessage('Откройте приложение в отдельной вкладке с установленным Phantom');
@@ -121,15 +125,26 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const disconnectWallet = useCallback(async () => {
     try {
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('foundly_wallet_disconnected', 'true');
+      }
       const provider = getProvider();
       if (provider) {
-        await provider.disconnect();
+        try {
+          await Promise.race([
+            provider.disconnect(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), 1200))
+          ]);
+        } catch (e) {
+          console.warn('Provider disconnect handled:', e);
+        }
       }
     } catch (err) {
-      console.error(err);
+      console.error('Wallet disconnect error:', err);
     } finally {
       setWalletAddress(null);
       setBalance(null);
+      setLastTxSignature(null);
     }
   }, [getProvider]);
 
@@ -139,19 +154,25 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [fetchBalance, walletAddress]);
 
-  // Auto-connect check if trusted
+  // Auto-connect check if trusted (only if not manually disconnected by user)
   useEffect(() => {
+    const isExplicitlyDisconnected =
+      typeof window !== 'undefined' &&
+      localStorage.getItem('foundly_wallet_disconnected') === 'true';
+
     const provider = getProvider();
     if (provider) {
-      provider.connect({ onlyIfTrusted: true })
-        .then((resp) => {
-          const pubkey = resp?.publicKey?.toString() || provider.publicKey?.toString();
-          if (pubkey) {
-            setWalletAddress(pubkey);
-            fetchBalance(pubkey);
-          }
-        })
-        .catch(() => {});
+      if (!isExplicitlyDisconnected) {
+        provider.connect({ onlyIfTrusted: true })
+          .then((resp) => {
+            const pubkey = resp?.publicKey?.toString() || provider.publicKey?.toString();
+            if (pubkey) {
+              setWalletAddress(pubkey);
+              fetchBalance(pubkey);
+            }
+          })
+          .catch(() => {});
+      }
 
       const handleAccountChange = (newKey: unknown) => {
         if (newKey) {
@@ -164,7 +185,20 @@ export const WalletProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
       };
 
+      const handleDisconnect = () => {
+        setWalletAddress(null);
+        setBalance(null);
+      };
+
       provider.on('accountChanged', handleAccountChange);
+      provider.on('disconnect', handleDisconnect);
+
+      return () => {
+        if (provider.removeListener) {
+          provider.removeListener('accountChanged', handleAccountChange);
+          provider.removeListener('disconnect', handleDisconnect);
+        }
+      };
     }
   }, [fetchBalance, getProvider]);
 

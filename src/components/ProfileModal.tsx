@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Building2, BookOpen, GraduationCap, Mail, LogOut, Check, AlertCircle, Trash2, Calendar, MapPin, Tag, PlusCircle } from 'lucide-react';
+import { X, User, Building2, BookOpen, GraduationCap, Mail, LogOut, Check, AlertCircle, Trash2, Calendar, MapPin, Tag, PlusCircle, Wallet, RefreshCw } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useWallet } from '../context/WalletContext';
 import { api } from '../services/api';
 import { FoundItem } from '../types';
 import { KAZAKHSTAN_UNIVERSITIES, COURSES, University } from '../data/kazakhstanUniversities';
@@ -18,6 +19,14 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onOpenReportFound })
     updateProfile,
     logout,
   } = useAuth();
+
+  const {
+    walletAddress,
+    balance,
+    connectWallet,
+    disconnectWallet,
+    isLoading: isWalletLoading,
+  } = useWallet();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'my_items'>('profile');
 
@@ -317,6 +326,59 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({ onOpenReportFound })
                       </select>
                     </div>
                   </div>
+                </div>
+
+                {/* Solana Devnet Wallet Connection */}
+                <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center">
+                        <Wallet className="w-3.5 h-3.5" />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-200">
+                        Кошелёк Solana Devnet (Phantom)
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-950 text-purple-300 border border-purple-800/60">
+                      Devnet
+                    </span>
+                  </div>
+
+                  {walletAddress ? (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1">
+                      <div className="text-xs">
+                        <div className="font-mono text-purple-200 text-[11px] truncate max-w-[280px]">
+                          {walletAddress}
+                        </div>
+                        <div className="text-[10px] text-emerald-400 font-mono mt-0.5">
+                          Баланс: {balance !== null ? `${balance} SOL` : '...'}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await disconnectWallet();
+                        }}
+                        className="px-3 py-1.5 rounded-lg text-xs font-medium text-rose-300 bg-rose-950/40 hover:bg-rose-950/70 border border-rose-800/40 flex items-center justify-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto"
+                      >
+                        <LogOut className="w-3 h-3 text-rose-400" />
+                        <span>Отключить кошелёк</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <span className="text-xs text-slate-400">Кошелёк не подключён</span>
+                      <button
+                        type="button"
+                        onClick={() => connectWallet()}
+                        disabled={isWalletLoading}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white bg-purple-600 hover:bg-purple-500 transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Wallet className="w-3 h-3" />
+                        <span>{isWalletLoading ? 'Подключение...' : 'Подключить Phantom'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Actions */}

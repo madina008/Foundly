@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Wallet, ExternalLink, Copy, Check, LogOut, RefreshCw, AlertTriangle, X } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Wallet, ExternalLink, Copy, Check, LogOut, RefreshCw, AlertTriangle, X, CheckCircle2 } from 'lucide-react';
 import { useWallet } from '../context/WalletContext';
 
 export const WalletButton: React.FC = () => {
@@ -17,6 +17,25 @@ export const WalletButton: React.FC = () => {
 
   const [copied, setCopied] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isDisconnecting, setIsDisconnecting] = useState(false);
+  const [disconnectToast, setDisconnectToast] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setShowDropdown(false);
+      }
+    };
+
+    if (showDropdown) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [showDropdown]);
 
   const copyToClipboard = () => {
     if (!walletAddress) return;
@@ -29,20 +48,42 @@ export const WalletButton: React.FC = () => {
     window.open(window.location.href, '_blank');
   };
 
+  const handleDisconnect = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDisconnecting(true);
+    try {
+      await disconnectWallet();
+      setShowDropdown(false);
+      setDisconnectToast(true);
+      setTimeout(() => setDisconnectToast(false), 3000);
+    } finally {
+      setIsDisconnecting(false);
+    }
+  };
+
   // Format address: First 4 and last 4 characters
   const formattedAddress = walletAddress
     ? `${walletAddress.slice(0, 4)}...${walletAddress.slice(-4)}`
     : '';
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
+      {/* Disconnect Toast Feedback */}
+      {disconnectToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-xs shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+          <span>Кошелёк успешно отключён</span>
+        </div>
+      )}
+
       {/* CONNECTED STATE */}
       {walletAddress ? (
         <div className="relative">
           <button
             type="button"
             onClick={() => setShowDropdown(!showDropdown)}
-            className="flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-medium bg-[#111728] border border-purple-500/50 hover:border-purple-400 text-slate-100 shadow-lg shadow-purple-950/20 transition-all hover:scale-[1.01]"
+            className="flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs font-medium bg-[#111728] border border-purple-500/50 hover:border-purple-400 text-slate-100 shadow-lg shadow-purple-950/20 transition-all hover:scale-[1.01] cursor-pointer"
           >
             {/* Solana Devnet dot */}
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -81,7 +122,7 @@ export const WalletButton: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowDropdown(false)}
-                  className="p-1 text-slate-400 hover:text-white rounded"
+                  className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -99,7 +140,7 @@ export const WalletButton: React.FC = () => {
                   <button
                     type="button"
                     onClick={copyToClipboard}
-                    className="p-1 text-slate-400 hover:text-white rounded"
+                    className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
                     title="Скопировать адрес"
                   >
                     {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
@@ -131,14 +172,21 @@ export const WalletButton: React.FC = () => {
               {/* Disconnect button */}
               <button
                 type="button"
-                onClick={async () => {
-                  await disconnectWallet();
-                  setShowDropdown(false);
-                }}
-                className="w-full py-2 px-3 rounded-xl text-xs font-medium text-rose-300 bg-rose-950/30 hover:bg-rose-950/60 border border-rose-800/40 flex items-center justify-center gap-1.5 transition-colors"
+                onClick={handleDisconnect}
+                disabled={isDisconnecting}
+                className="w-full py-2.5 px-3 rounded-xl text-xs font-semibold text-rose-300 bg-rose-950/40 hover:bg-rose-950/80 border border-rose-800/50 hover:border-rose-700 flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
               >
-                <LogOut className="w-3.5 h-3.5" />
-                <span>Отключить кошелёк</span>
+                {isDisconnecting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Отключение...</span>
+                  </>
+                ) : (
+                  <>
+                    <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Отключить кошелёк</span>
+                  </>
+                )}
               </button>
             </div>
           )}
@@ -149,7 +197,7 @@ export const WalletButton: React.FC = () => {
           type="button"
           onClick={() => connectWallet()}
           disabled={isLoading}
-          className="group relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 border border-purple-400/30 shadow-md shadow-purple-900/30 hover:shadow-purple-700/40 transition-all hover:scale-[1.01] active:scale-[0.99]"
+          className="group relative flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 border border-purple-400/30 shadow-md shadow-purple-900/30 hover:shadow-purple-700/40 transition-all hover:scale-[1.01] active:scale-[0.99] cursor-pointer"
         >
           <Wallet className="w-4 h-4 text-purple-200 group-hover:rotate-6 transition-transform" />
           <span>{isLoading ? 'Подключение...' : 'Подключить кошелёк'}</span>
